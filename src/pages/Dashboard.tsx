@@ -1,30 +1,49 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, Package, ShoppingCart, DollarSign } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-
 const Dashboard = () => {
   // Dados mockados - em produção, viriam do Supabase
-  const salesData = [
-    { name: 'Jan', vendas: 4000, despesas: 2400 },
-    { name: 'Fev', vendas: 3000, despesas: 1398 },
-    { name: 'Mar', vendas: 2000, despesas: 9800 },
-    { name: 'Abr', vendas: 2780, despesas: 3908 },
-    { name: 'Mai', vendas: 1890, despesas: 4800 },
-    { name: 'Jun', vendas: 2390, despesas: 3800 },
-  ];
-
-  const productsSold = [
-    { name: 'Produto A', vendas: 120 },
-    { name: 'Produto B', vendas: 80 },
-    { name: 'Produto C', vendas: 60 },
-    { name: 'Produto D', vendas: 40 },
-  ];
-
-  return (
-    <div className="space-y-6">
+  const salesData = [{
+    name: 'Jan',
+    vendas: 4000,
+    despesas: 2400
+  }, {
+    name: 'Fev',
+    vendas: 3000,
+    despesas: 1398
+  }, {
+    name: 'Mar',
+    vendas: 2000,
+    despesas: 9800
+  }, {
+    name: 'Abr',
+    vendas: 2780,
+    despesas: 3908
+  }, {
+    name: 'Mai',
+    vendas: 1890,
+    despesas: 4800
+  }, {
+    name: 'Jun',
+    vendas: 2390,
+    despesas: 3800
+  }];
+  const productsSold = [{
+    name: 'Produto A',
+    vendas: 120
+  }, {
+    name: 'Produto B',
+    vendas: 80
+  }, {
+    name: 'Produto C',
+    vendas: 60
+  }, {
+    name: 'Produto D',
+    vendas: 40
+  }];
+  return <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard Financeiro</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Financeiro</h1>
         <p className="text-gray-600">Visão geral do seu negócio</p>
       </div>
 
@@ -96,21 +115,9 @@ const Dashboard = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`R$ ${value}`, '']} />
-                <Line 
-                  type="monotone" 
-                  dataKey="vendas" 
-                  stroke="#3b82f6" 
-                  strokeWidth={2}
-                  name="Vendas"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="despesas" 
-                  stroke="#ef4444" 
-                  strokeWidth={2}
-                  name="Despesas"
-                />
+                <Tooltip formatter={value => [`R$ ${value}`, '']} />
+                <Line type="monotone" dataKey="vendas" stroke="#3b82f6" strokeWidth={2} name="Vendas" />
+                <Line type="monotone" dataKey="despesas" stroke="#ef4444" strokeWidth={2} name="Despesas" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -162,8 +169,6 @@ const Dashboard = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default Dashboard;
