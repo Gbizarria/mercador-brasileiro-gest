@@ -101,28 +101,31 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip
 
+interface ChartTooltipContentProps {
+  active?: boolean
+  payload?: Array<{
+    color?: string
+    name?: string
+    value?: number | string
+    dataKey?: string
+    payload?: Record<string, any>
+  }>
+  label?: string
+  hideLabel?: boolean
+  hideIndicator?: boolean
+  indicator?: "line" | "dot" | "dashed"
+  nameKey?: string
+  labelKey?: string
+  labelFormatter?: (value: any, payload: any[]) => React.ReactNode
+  formatter?: (value: any, name: any, props: any, index: number, payload: any) => React.ReactNode
+  labelClassName?: string
+  color?: string
+  className?: string
+}
+
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    active?: boolean
-    payload?: Array<{
-      color?: string
-      name?: string
-      value?: number | string
-      dataKey?: string
-      payload?: Record<string, any>
-    }>
-    label?: string
-    hideLabel?: boolean
-    hideIndicator?: boolean
-    indicator?: "line" | "dot" | "dashed"
-    nameKey?: string
-    labelKey?: string
-    labelFormatter?: (value: any, payload: any[]) => React.ReactNode
-    formatter?: (value: any, name: any, props: any, index: number, payload: any) => React.ReactNode
-    labelClassName?: string
-    color?: string
-  }
+  ChartTooltipContentProps
 >(
   (
     {
@@ -269,19 +272,22 @@ ChartTooltipContent.displayName = "ChartTooltip"
 
 const ChartLegend = RechartsPrimitive.Legend
 
+interface ChartLegendContentProps {
+  payload?: Array<{
+    value?: string
+    type?: string
+    color?: string
+    dataKey?: string
+  }>
+  verticalAlign?: "top" | "bottom"
+  hideIcon?: boolean
+  nameKey?: string
+  className?: string
+}
+
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    payload?: Array<{
-      value?: string
-      type?: string
-      color?: string
-      dataKey?: string
-    }>
-    verticalAlign?: "top" | "bottom"
-    hideIcon?: boolean
-    nameKey?: string
-  }
+  ChartLegendContentProps
 >(
   (
     { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },
