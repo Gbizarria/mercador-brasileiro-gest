@@ -5,28 +5,73 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Eye, Package, Clock, Truck } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+
+interface OrderItem {
+  id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  products: {
+    name: string;
+  };
+}
 
 interface Order {
   id: string;
-  items: Array<{
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-  }>;
-  total: number;
   status: string;
-  createdAt: string;
+  total: number;
+  shipping_fee: number;
+  created_at: string;
+  order_items: OrderItem[];
 }
 
 const MyOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Carregar pedidos do localStorage - em produção, usar Supabase
-    const savedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-    setOrders(savedOrders.reverse()); // Mais recentes primeiro
-  }, []);
+    if (user) {
+      fetchOrders();
+    }
+  }, [user]);
+
+  const fetchOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          status,
+          total,
+          shipping_fee,
+          created_at,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            price,
+            products (
+              name
+            )
+          )
+        `)
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching orders:', error);
+      } else {
+        setOrders(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -64,6 +109,14 @@ const MyOrders = () => {
     });
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -90,9 +143,9 @@ const MyOrders = () => {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle className="text-lg">Pedido #{order.id}</CardTitle>
+                    <CardTitle className="text-lg">Pedido #{order.id.slice(0, 8)}</CardTitle>
                     <CardDescription>
-                      Realizado em {formatDate(order.createdAt)}
+                      Realizado em {formatDate(order.created_at)}
                     </CardDescription>
                   </div>
                   <Badge className={`flex items-center gap-1 ${getStatusColor(order.status)}`}>
@@ -107,9 +160,9 @@ const MyOrders = () => {
                   <div>
                     <h4 className="font-medium mb-2">Itens:</h4>
                     <div className="space-y-1">
-                      {order.items.map((item) => (
+                      {order.order_items.map((item) => (
                         <div key={item.id} className="flex justify-between text-sm">
-                          <span>{item.name} (x{item.quantity})</span>
+                          <span>{item.products.name} (x{item.quantity})</span>
                           <span>R$ {(item.price * item.quantity).toFixed(2).replace('.', ',')}</span>
                         </div>
                       ))}
@@ -120,7 +173,7 @@ const MyOrders = () => {
                   <div className="flex justify-between items-center pt-4 border-t">
                     <div>
                       <span className="font-semibold">
-                        Total: R$ {(order.total + 15).toFixed(2).replace('.', ',')}
+                        Total: R$ {(order.total + order.shipping_fee).toFixed(2).replace('.', ',')}
                       </span>
                       <span className="text-sm text-gray-500 ml-2">(incluindo frete)</span>
                     </div>
