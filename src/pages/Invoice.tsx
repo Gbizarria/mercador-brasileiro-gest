@@ -1,11 +1,9 @@
-
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Download, FileText } from 'lucide-react';
-
 interface Order {
   id: string;
   items: Array<{
@@ -28,18 +26,17 @@ interface Order {
   status: string;
   createdAt: string;
 }
-
 const Invoice = () => {
-  const { orderId } = useParams();
+  const {
+    orderId
+  } = useParams();
   const [order, setOrder] = useState<Order | null>(null);
-
   useEffect(() => {
     // Carregar pedido do localStorage - em produção, usar Supabase
     const orders = JSON.parse(localStorage.getItem('orders') || '[]');
     const foundOrder = orders.find((o: Order) => o.id === orderId);
     setOrder(foundOrder);
   }, [orderId]);
-
   const handleDownloadPDF = () => {
     // Em produção, implementar geração real de PDF
     // Aqui simulamos o download
@@ -48,10 +45,8 @@ const Invoice = () => {
       window.print();
     }
   };
-
   if (!order) {
-    return (
-      <div className="space-y-6">
+    return <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Fatura não encontrada</h1>
         </div>
@@ -60,29 +55,26 @@ const Invoice = () => {
             <p className="text-gray-500">Pedido não encontrado ou inválido.</p>
           </CardContent>
         </Card>
-      </div>
-    );
+      </div>;
   }
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
-
   const getPaymentMethodName = (method: string) => {
-    const methods: { [key: string]: string } = {
+    const methods: {
+      [key: string]: string;
+    } = {
       credit_card: 'Cartão de Crédito',
       debit_card: 'Cartão de Débito',
       pix: 'PIX',
-      boleto: 'Boleto Bancário',
+      boleto: 'Boleto Bancário'
     };
     return methods[method] || method;
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Fatura do Pedido</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Pedido Concluído</h1>
           <p className="text-gray-600">Pedido #{order.id}</p>
         </div>
         <Button onClick={handleDownloadPDF} className="flex items-center gap-2">
@@ -129,9 +121,7 @@ const Invoice = () => {
               <h3 className="font-semibold mb-3">Endereço de Entrega</h3>
               <div className="text-sm text-gray-600">
                 <p>{order.shippingAddress.street}, {order.shippingAddress.number}</p>
-                {order.shippingAddress.complement && (
-                  <p>{order.shippingAddress.complement}</p>
-                )}
+                {order.shippingAddress.complement && <p>{order.shippingAddress.complement}</p>}
                 <p>{order.shippingAddress.neighborhood}</p>
                 <p>{order.shippingAddress.city}/{order.shippingAddress.state}</p>
                 <p>CEP: {order.shippingAddress.zipCode}</p>
@@ -155,8 +145,7 @@ const Invoice = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {order.items.map((item) => (
-                    <tr key={item.id} className="border-b">
+                  {order.items.map(item => <tr key={item.id} className="border-b">
                       <td className="py-3">{item.name}</td>
                       <td className="text-center py-3">{item.quantity}</td>
                       <td className="text-right py-3">
@@ -165,8 +154,7 @@ const Invoice = () => {
                       <td className="text-right py-3">
                         R$ {(item.price * item.quantity).toFixed(2).replace('.', ',')}
                       </td>
-                    </tr>
-                  ))}
+                    </tr>)}
                 </tbody>
               </table>
             </div>
@@ -202,8 +190,6 @@ const Invoice = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default Invoice;
