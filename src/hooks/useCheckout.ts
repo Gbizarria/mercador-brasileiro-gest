@@ -125,7 +125,7 @@ export const useCheckout = () => {
           total: total,
           shipping_fee: shipping,
           payment_method: paymentMethod,
-          shipping_address: shippingData,
+          shipping_address: shippingData as any,
           status: 'Pedido Realizado'
         })
         .select()
