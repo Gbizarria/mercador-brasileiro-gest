@@ -6,55 +6,126 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { Package, Clock, Truck, CheckCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+
+interface OrderItem {
+  id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  products: {
+    name: string;
+  };
+}
 
 interface Order {
   id: string;
-  items: Array<{
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-  }>;
-  total: number;
+  user_id: string;
   status: string;
-  createdAt: string;
-  shippingAddress: {
-    street: string;
-    number: string;
-    complement?: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
-  paymentMethod: string;
+  total: number;
+  shipping_fee: number;
+  created_at: string;
+  shipping_address: any;
+  payment_method: string;
+  order_items: OrderItem[];
 }
 
 const OrderManagement = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    if (user && user.role === 'admin') {
+      fetchOrders();
+    }
+  }, [user]);
 
-  const loadOrders = () => {
-    // Carregar pedidos do localStorage - em produção, usar Supabase
-    const savedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-    setOrders(savedOrders.reverse()); // Mais recentes primeiro
+  const fetchOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          user_id,
+          status,
+          total,
+          shipping_fee,
+          created_at,
+          shipping_address,
+          payment_method,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            price,
+            products (
+              name
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching orders:', error);
+        toast({
+          title: "Erro ao carregar pedidos",
+          description: "Não foi possível carregar os pedidos.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast({
+        title: "Erro ao carregar pedidos",
+        description: "Ocorreu um erro inesperado.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const updateOrderStatus = (orderId: string, newStatus: string) => {
-    const updatedOrders = orders.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    );
-    
-    setOrders(updatedOrders);
-    localStorage.setItem('orders', JSON.stringify(updatedOrders.reverse()));
-    
-    toast({
-      title: "Status atualizado!",
-      description: `Pedido #${orderId} foi marcado como "${newStatus}".`,
-    });
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error updating order status:', error);
+        toast({
+          title: "Erro ao atualizar status",
+          description: "Não foi possível atualizar o status do pedido.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update local state
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+
+      toast({
+        title: "Status atualizado!",
+        description: `Pedido foi marcado como "${newStatus}".`,
+      });
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast({
+        title: "Erro ao atualizar status",
+        description: "Ocorreu um erro inesperado.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -106,6 +177,22 @@ const OrderManagement = () => {
     };
     return methods[method] || method;
   };
+
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Acesso restrito a administradores.</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -186,9 +273,9 @@ const OrderManagement = () => {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle className="text-lg">Pedido #{order.id}</CardTitle>
+                    <CardTitle className="text-lg">Pedido #{order.id.slice(0, 8)}</CardTitle>
                     <CardDescription>
-                      Realizado em {formatDate(order.createdAt)}
+                      Realizado em {formatDate(order.created_at)}
                     </CardDescription>
                   </div>
                   <Badge className={`flex items-center gap-1 ${getStatusColor(order.status)}`}>
@@ -204,9 +291,9 @@ const OrderManagement = () => {
                     <div>
                       <h4 className="font-medium mb-2">Itens do Pedido:</h4>
                       <div className="space-y-1">
-                        {order.items.map((item) => (
+                        {order.order_items.map((item) => (
                           <div key={item.id} className="flex justify-between text-sm">
-                            <span>{item.name} (x{item.quantity})</span>
+                            <span>{item.products.name} (x{item.quantity})</span>
                             <span>R$ {(item.price * item.quantity).toFixed(2).replace('.', ',')}</span>
                           </div>
                         ))}
@@ -216,13 +303,13 @@ const OrderManagement = () => {
                     <div className="pt-2 border-t">
                       <div className="flex justify-between font-semibold">
                         <span>Total:</span>
-                        <span>R$ {(order.total + 15).toFixed(2).replace('.', ',')}</span>
+                        <span>R$ {(order.total + order.shipping_fee).toFixed(2).replace('.', ',')}</span>
                       </div>
                     </div>
 
                     <div>
                       <h4 className="font-medium mb-1">Forma de Pagamento:</h4>
-                      <p className="text-sm text-gray-600">{getPaymentMethodName(order.paymentMethod)}</p>
+                      <p className="text-sm text-gray-600">{getPaymentMethodName(order.payment_method)}</p>
                     </div>
                   </div>
 
@@ -231,13 +318,13 @@ const OrderManagement = () => {
                     <div>
                       <h4 className="font-medium mb-2">Endereço de Entrega:</h4>
                       <div className="text-sm text-gray-600 space-y-1">
-                        <p>{order.shippingAddress.street}, {order.shippingAddress.number}</p>
-                        {order.shippingAddress.complement && (
-                          <p>{order.shippingAddress.complement}</p>
+                        <p>{order.shipping_address.street}, {order.shipping_address.number}</p>
+                        {order.shipping_address.complement && (
+                          <p>{order.shipping_address.complement}</p>
                         )}
-                        <p>{order.shippingAddress.neighborhood}</p>
-                        <p>{order.shippingAddress.city}/{order.shippingAddress.state}</p>
-                        <p>CEP: {order.shippingAddress.zipCode}</p>
+                        <p>{order.shipping_address.neighborhood}</p>
+                        <p>{order.shipping_address.city}/{order.shipping_address.state}</p>
+                        <p>CEP: {order.shipping_address.zipCode}</p>
                       </div>
                     </div>
 

@@ -7,30 +7,93 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { Plus } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ProductRegistration = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [category, setCategory] = useState('');
+  const [stockQuantity, setStockQuantity] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user || user.role !== 'admin') {
+      toast({
+        title: "Acesso negado",
+        description: "Apenas administradores podem cadastrar produtos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Input validation
+    if (name.length > 255) {
+      toast({
+        title: "Nome muito longo",
+        description: "O nome do produto deve ter no máximo 255 caracteres.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (description && description.length > 1000) {
+      toast({
+        title: "Descrição muito longa",
+        description: "A descrição deve ter no máximo 1000 caracteres.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const priceValue = parseFloat(price);
+    const stockValue = parseInt(stockQuantity) || 0;
+
+    if (priceValue <= 0) {
+      toast({
+        title: "Preço inválido",
+        description: "O preço deve ser maior que zero.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (stockValue < 0) {
+      toast({
+        title: "Estoque inválido",
+        description: "A quantidade em estoque não pode ser negativa.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Simular salvamento - em produção, usar Supabase
-      const products = JSON.parse(localStorage.getItem('products') || '[]');
-      const newProduct = {
-        id: Date.now().toString(),
-        name,
-        description,
-        price: parseFloat(price),
-        createdAt: new Date().toISOString(),
-      };
+      const { error } = await supabase
+        .from('products')
+        .insert({
+          name: name.trim(),
+          description: description.trim() || null,
+          price: priceValue,
+          category: category.trim() || null,
+          stock_quantity: stockValue,
+          is_active: true
+        });
 
-      products.push(newProduct);
-      localStorage.setItem('products', JSON.stringify(products));
+      if (error) {
+        console.error('Error creating product:', error);
+        toast({
+          title: "Erro ao cadastrar produto",
+          description: "Ocorreu um erro interno. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
         title: "Produto cadastrado com sucesso!",
@@ -41,7 +104,10 @@ const ProductRegistration = () => {
       setName('');
       setDescription('');
       setPrice('');
+      setCategory('');
+      setStockQuantity('');
     } catch (error) {
+      console.error('Error creating product:', error);
       toast({
         title: "Erro ao cadastrar produto",
         description: "Tente novamente mais tarde.",
@@ -72,13 +138,14 @@ const ProductRegistration = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nome do Produto</Label>
+              <Label htmlFor="name">Nome do Produto *</Label>
               <Input
                 id="name"
                 type="text"
                 placeholder="Digite o nome do produto"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                maxLength={255}
                 required
               />
             </div>
@@ -90,22 +157,48 @@ const ProductRegistration = () => {
                 placeholder="Descreva o produto detalhadamente"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                required
+                maxLength={1000}
                 rows={4}
               />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="price">Preço (R$) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stockQuantity">Quantidade em Estoque</Label>
+                <Input
+                  id="stockQuantity"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={stockQuantity}
+                  onChange={(e) => setStockQuantity(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="price">Preço (R$)</Label>
+              <Label htmlFor="category">Categoria</Label>
               <Input
-                id="price"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0,00"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                required
+                id="category"
+                type="text"
+                placeholder="Ex: Eletrônicos, Acessórios, etc."
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                maxLength={100}
               />
             </div>
 
@@ -120,14 +213,13 @@ const ProductRegistration = () => {
         </CardContent>
       </Card>
 
-      {/* Lista de produtos cadastrados recentemente */}
       <Card>
         <CardHeader>
-          <CardTitle>Produtos Cadastrados Recentemente</CardTitle>
+          <CardTitle>Produtos Cadastrados</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-sm text-gray-600">
-            Os produtos cadastrados aparecerão aqui. Para visualizar todos os produtos, acesse o{' '}
+            Para visualizar todos os produtos cadastrados, acesse o{' '}
             <a href="/produtos/catalogo" className="text-primary hover:underline">
               catálogo completo
             </a>

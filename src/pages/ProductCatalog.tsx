@@ -6,50 +6,55 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Search, ShoppingCart } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const ProductCatalog = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const { addToCart } = useCart();
 
   useEffect(() => {
-    // Carregar produtos do localStorage - em produção, usar Supabase
-    const savedProducts = JSON.parse(localStorage.getItem('products') || '[]');
-    
-    // Adicionar alguns produtos de exemplo se não houver nenhum
-    if (savedProducts.length === 0) {
-      const exampleProducts = [
-        {
-          id: '1',
-          name: 'Notebook Dell Inspiron',
-          description: 'Notebook Dell com 8GB RAM, SSD 256GB, Intel i5',
-          price: 2599.99
-        },
-        {
-          id: '2',
-          name: 'Mouse Wireless Logitech',
-          description: 'Mouse sem fio com tecnologia avançada',
-          price: 89.90
-        },
-        {
-          id: '3',
-          name: 'Teclado Mecânico RGB',
-          description: 'Teclado mecânico com iluminação RGB personalizável',
-          price: 299.99
-        },
-        {
-          id: '4',
-          name: 'Monitor 24" Full HD',
-          description: 'Monitor LED 24 polegadas com resolução Full HD',
-          price: 699.99
-        }
-      ];
-      setProducts(exampleProducts);
-      localStorage.setItem('products', JSON.stringify(exampleProducts));
-    } else {
-      setProducts(savedProducts);
-    }
+    fetchProducts();
   }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching products:', error);
+        toast({
+          title: "Erro ao carregar produtos",
+          description: "Não foi possível carregar os produtos. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const formattedProducts: Product[] = data.map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description || '',
+        price: parseFloat(product.price.toString())
+      }));
+
+      setProducts(formattedProducts);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast({
+        title: "Erro ao carregar produtos",
+        description: "Ocorreu um erro inesperado.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -63,6 +68,14 @@ const ProductCatalog = () => {
       description: `${product.name} foi adicionado com sucesso.`,
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -80,6 +93,7 @@ const ProductCatalog = () => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
+          maxLength={100}
         />
       </div>
 
@@ -118,7 +132,7 @@ const ProductCatalog = () => {
         </div>
       )}
 
-      {products.length === 0 && (
+      {products.length === 0 && !isLoading && (
         <div className="text-center py-12">
           <p className="text-gray-500">
             Nenhum produto cadastrado ainda.{' '}

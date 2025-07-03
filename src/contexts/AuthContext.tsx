@@ -64,10 +64,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
+        // If profile doesn't exist, try to create it
+        if (error.code === 'PGRST116') {
+          await createUserProfile(authUser);
+          return;
+        }
+        
         console.error('Error fetching profile:', error);
+        // Fallback to basic user info without exposing error details
         setUser({
           id: authUser.id,
-          name: authUser.email?.split('@')[0] || 'User',
+          name: authUser.email?.split('@')[0] || 'Usuário',
           email: authUser.email || '',
           role: 'customer'
         });
@@ -81,20 +88,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
+      // Fallback without exposing internal error
+      setUser({
+        id: authUser.id,
+        name: authUser.email?.split('@')[0] || 'Usuário',
+        email: authUser.email || '',
+        role: 'customer'
+      });
     } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createUserProfile = async (authUser: User) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .insert({
+          id: authUser.id,
+          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Usuário',
+          email: authUser.email || '',
+          role: 'customer'
+        });
+
+      if (error) {
+        console.error('Error creating profile:', error);
+      }
+
+      // Fetch the profile again
+      await fetchUserProfile(authUser);
+    } catch (error) {
+      console.error('Error creating user profile:', error);
+      // Set fallback user data
+      setUser({
+        id: authUser.id,
+        name: authUser.email?.split('@')[0] || 'Usuário',
+        email: authUser.email || '',
+        role: 'customer'
+      });
       setIsLoading(false);
     }
   };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      // Input validation
+      if (!email || !password) {
+        return false;
+      }
+
+      if (email.length > 254 || password.length > 128) {
+        return false;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
 
       if (error) {
-        console.error('Login error:', error);
+        console.error('Login error:', error.message);
         return false;
       }
 
@@ -107,18 +160,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (name: string, email: string, password: string): Promise<boolean> => {
     try {
+      // Input validation
+      if (!name || !email || !password) {
+        return false;
+      }
+
+      if (name.length > 100 || email.length > 254 || password.length > 128) {
+        return false;
+      }
+
+      if (password.length < 6) {
+        return false;
+      }
+
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
-            name: name,
-          }
+            name: name.trim(),
+          },
+          emailRedirectTo: `${window.location.origin}/login`
         }
       });
 
       if (error) {
-        console.error('Registration error:', error);
+        console.error('Registration error:', error.message);
         return false;
       }
 
@@ -135,6 +202,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
+      // Force logout locally even if server call fails
+      setUser(null);
     }
   };
 
