@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
@@ -14,7 +13,7 @@ import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const Cart = () => {
-  const { items, updateQuantity, removeFromCart, clearCart, getCartTotal } = useCart();
+  const { items, updateQuantity, removeFromCart, clearCart, total } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -32,9 +31,9 @@ const Cart = () => {
 
   const [paymentMethod, setPaymentMethod] = useState('');
 
-  const subtotal = getCartTotal();
+  const subtotal = total;
   const shipping = 15.00;
-  const total = subtotal + shipping;
+  const orderTotal = subtotal + shipping;
 
   const handleInputChange = (field: string, value: string) => {
     // Input validation and sanitization
@@ -378,7 +377,7 @@ const Cart = () => {
               
               <div className="flex justify-between font-bold text-lg">
                 <span>Total:</span>
-                <span>R$ {total.toFixed(2).replace('.', ',')}</span>
+                <span>R$ {orderTotal.toFixed(2).replace('.', ',')}</span>
               </div>
 
               <div className="space-y-2">
