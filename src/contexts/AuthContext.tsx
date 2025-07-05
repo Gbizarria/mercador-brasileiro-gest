@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User } from '@supabase/supabase-js';
@@ -33,8 +32,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
+    console.log('AuthProvider: Setting up auth state listener');
+    
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      
+      if (session?.user) {
+        console.log('User session found, fetching profile');
+        await fetchUserProfile(session.user);
+      } else {
+        console.log('No user session');
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.email);
       if (session?.user) {
         fetchUserProfile(session.user);
       } else {
@@ -42,21 +58,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await fetchUserProfile(session.user);
-      } else {
-        setUser(null);
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('Cleaning up auth subscription');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserProfile = async (authUser: User) => {
     try {
+      console.log('Fetching profile for user:', authUser.id);
+      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('name, email, role')
@@ -64,14 +75,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
+        console.log('Profile fetch error:', error.message);
         // If profile doesn't exist, try to create it
         if (error.code === 'PGRST116') {
+          console.log('Profile not found, creating new profile');
           await createUserProfile(authUser);
           return;
         }
         
-        console.error('Error fetching profile:', error);
-        // Fallback to basic user info without exposing error details
+        // Fallback to basic user info
         setUser({
           id: authUser.id,
           name: authUser.email?.split('@')[0] || 'Usuário',
@@ -79,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: 'customer'
         });
       } else {
+        console.log('Profile fetched successfully:', profile);
         setUser({
           id: authUser.id,
           name: profile.name,
@@ -102,6 +115,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createUserProfile = async (authUser: User) => {
     try {
+      console.log('Creating profile for user:', authUser.id);
+      
       const { error } = await supabase
         .from('profiles')
         .insert({
@@ -113,6 +128,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error creating profile:', error);
+      } else {
+        console.log('Profile created successfully');
       }
 
       // Fetch the profile again
@@ -132,12 +149,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('Attempting login for:', email);
+      
       // Input validation
       if (!email || !password) {
+        console.log('Login failed: Missing email or password');
         return false;
       }
 
       if (email.length > 254 || password.length > 128) {
+        console.log('Login failed: Email or password too long');
         return false;
       }
 
@@ -151,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
+      console.log('Login successful for:', data.user?.email);
       return !!data.user;
     } catch (error) {
       console.error('Login error:', error);
@@ -198,6 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      console.log('Logging out user');
       await supabase.auth.signOut();
       setUser(null);
     } catch (error) {
