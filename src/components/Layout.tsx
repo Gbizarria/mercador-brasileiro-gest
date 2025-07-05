@@ -20,7 +20,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate('/login');
   };
 
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -32,10 +32,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-8">
-              <Link to="/dashboard" className="text-2xl font-bold text-primary">OrderBiza</Link>
+              <Link to="/" className="text-2xl font-bold text-primary">OrderBiza</Link>
               
               <nav className="hidden md:flex space-x-6">
-                <Link to="/dashboard" className="text-gray-600 hover:text-primary transition-colors">
+                <Link to="/" className="text-gray-600 hover:text-primary transition-colors">
                   Dashboard
                 </Link>
                 
