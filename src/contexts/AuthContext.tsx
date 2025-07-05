@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User } from '@supabase/supabase-js';
@@ -34,7 +35,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('AuthProvider: Setting up auth state listener');
     
-    // Set up auth state listener first
+    // Check current session first
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setIsLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          console.log('Initial session found:', session.user.email);
+          await fetchUserProfile(session.user);
+        } else {
+          console.log('No initial session found');
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        setIsLoading(false);
+      }
+    };
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.email);
       
@@ -48,15 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.email);
-      if (session?.user) {
-        fetchUserProfile(session.user);
-      } else {
-        setIsLoading(false);
-      }
-    });
+    // Initialize auth
+    initializeAuth();
 
     return () => {
       console.log('Cleaning up auth subscription');
@@ -76,14 +94,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.log('Profile fetch error:', error.message);
-        // If profile doesn't exist, try to create it
+        // If profile doesn't exist, create it or use fallback
         if (error.code === 'PGRST116') {
-          console.log('Profile not found, creating new profile');
-          await createUserProfile(authUser);
-          return;
+          console.log('Profile not found, using fallback data');
         }
         
-        // Fallback to basic user info
+        // Use fallback data
         setUser({
           id: authUser.id,
           name: authUser.email?.split('@')[0] || 'Usuário',
@@ -101,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
-      // Fallback without exposing internal error
+      // Fallback user data
       setUser({
         id: authUser.id,
         name: authUser.email?.split('@')[0] || 'Usuário',
@@ -113,54 +129,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const createUserProfile = async (authUser: User) => {
-    try {
-      console.log('Creating profile for user:', authUser.id);
-      
-      const { error } = await supabase
-        .from('profiles')
-        .insert({
-          id: authUser.id,
-          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Usuário',
-          email: authUser.email || '',
-          role: 'customer'
-        });
-
-      if (error) {
-        console.error('Error creating profile:', error);
-      } else {
-        console.log('Profile created successfully');
-      }
-
-      // Fetch the profile again
-      await fetchUserProfile(authUser);
-    } catch (error) {
-      console.error('Error creating user profile:', error);
-      // Set fallback user data
-      setUser({
-        id: authUser.id,
-        name: authUser.email?.split('@')[0] || 'Usuário',
-        email: authUser.email || '',
-        role: 'customer'
-      });
-      setIsLoading(false);
-    }
-  };
-
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       console.log('Attempting login for:', email);
       
-      // Input validation
       if (!email || !password) {
         console.log('Login failed: Missing email or password');
         return false;
       }
 
-      if (email.length > 254 || password.length > 128) {
-        console.log('Login failed: Email or password too long');
-        return false;
-      }
+      setIsLoading(true);
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
@@ -169,25 +147,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Login error:', error.message);
+        setIsLoading(false);
         return false;
       }
 
       console.log('Login successful for:', data.user?.email);
+      // Don't set isLoading to false here - let the auth state change handle it
       return !!data.user;
     } catch (error) {
       console.error('Login error:', error);
+      setIsLoading(false);
       return false;
     }
   };
 
   const register = async (name: string, email: string, password: string): Promise<boolean> => {
     try {
-      // Input validation
       if (!name || !email || !password) {
-        return false;
-      }
-
-      if (name.length > 100 || email.length > 254 || password.length > 128) {
         return false;
       }
 
@@ -202,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           data: {
             name: name.trim(),
           },
-          emailRedirectTo: `${window.location.origin}/login`
+          emailRedirectTo: `${window.location.origin}/`
         }
       });
 
@@ -223,10 +199,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Logging out user');
       await supabase.auth.signOut();
       setUser(null);
+      setIsLoading(false);
     } catch (error) {
       console.error('Logout error:', error);
-      // Force logout locally even if server call fails
       setUser(null);
+      setIsLoading(false);
     }
   };
 

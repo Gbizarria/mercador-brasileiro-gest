@@ -18,14 +18,17 @@ const Login = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
-      navigate('/dashboard');
+      console.log('User is authenticated, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
     }
   }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLoading) return;
+    
     setIsLoading(true);
-
     console.log('Starting login process for:', email);
 
     try {
@@ -57,7 +60,7 @@ const Login = () => {
     }
   };
 
-  // Show loading while checking auth state
+  // Show loading spinner only while checking auth state initially
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
