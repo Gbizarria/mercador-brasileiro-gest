@@ -33,26 +33,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchUserProfile(session.user);
-      } else {
-        setIsLoading(false);
-      }
-    });
+    let mounted = true;
 
-    // Listen for auth changes
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await fetchUserProfile(session.user);
-      } else {
+      console.log('Auth event:', event, 'Session:', !!session);
+      
+      if (!mounted) return;
+
+      if (event === 'SIGNED_OUT' || !session?.user) {
         setUser(null);
         setIsLoading(false);
+        return;
+      }
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          await fetchUserProfile(session.user);
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Get initial session
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        if (session?.user && mounted) {
+          await fetchUserProfile(session.user);
+        } else if (mounted) {
+          setUser(null);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setUser(null);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserProfile = async (authUser: User) => {
@@ -64,14 +100,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
+        console.error('Error fetching profile:', error);
         // If profile doesn't exist, try to create it
         if (error.code === 'PGRST116') {
           await createUserProfile(authUser);
           return;
         }
         
-        console.error('Error fetching profile:', error);
-        // Fallback to basic user info without exposing error details
+        // Fallback to basic user info
         setUser({
           id: authUser.id,
           name: authUser.email?.split('@')[0] || 'Usuário',
@@ -88,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
-      // Fallback without exposing internal error
+      // Fallback
       setUser({
         id: authUser.id,
         name: authUser.email?.split('@')[0] || 'Usuário',
@@ -134,12 +170,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Input validation
       if (!email || !password) {
+        console.error('Email and password are required');
         return false;
       }
 
       if (email.length > 254 || password.length > 128) {
+        console.error('Email or password too long');
         return false;
       }
+
+      console.log('Attempting login for:', email);
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
@@ -151,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
+      console.log('Login successful:', !!data.user);
       return !!data.user;
     } catch (error) {
       console.error('Login error:', error);
@@ -198,12 +239,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await supabase.auth.signOut();
+      console.log('Logging out...');
+      
+      // Clear user state immediately
       setUser(null);
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Logout error:', error);
+      } else {
+        console.log('Logout successful');
+      }
     } catch (error) {
       console.error('Logout error:', error);
-      // Force logout locally even if server call fails
-      setUser(null);
     }
   };
 

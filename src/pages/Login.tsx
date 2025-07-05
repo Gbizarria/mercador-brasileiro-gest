@@ -12,15 +12,26 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  if (user) {
+    navigate('/');
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLoading) return; // Prevent double submission
+    
     setIsLoading(true);
 
     try {
+      console.log('Login form submitted');
       const success = await login(email, password);
+      
       if (success) {
         toast({
           title: "Login realizado com sucesso!",
@@ -35,6 +46,7 @@ const Login = () => {
         });
       }
     } catch (error) {
+      console.error('Login submission error:', error);
       toast({
         title: "Erro no login",
         description: "Tente novamente mais tarde.",
@@ -65,6 +77,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -76,6 +89,7 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
             <Button
